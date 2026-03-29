@@ -1,0 +1,92 @@
+name: CI — Lint & Validate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  python-lint:
+    name: 🐍 Python Lint (Lambda Functions)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint with flake8
+        run: |
+          # Stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Warn on style issues but don't fail the build
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+  js-lint:
+    name: 🌐 JavaScript Lint (Frontend)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check JS syntax
+        run: |
+          echo "Checking JavaScript syntax..."
+          node --check scripts.js && echo "✅ scripts.js syntax OK"
+
+  security-check:
+    name: 🔒 Security — Secrets Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for hardcoded secrets/keys
+        run: |
+          echo "Scanning for hardcoded AWS keys or secrets..."
+          # Fail if AWS Access Key patterns are found
+          if grep -rE "AKIA[0-9A-Z]{16}" . --include="*.py" --include="*.js" --include="*.html"; then
+            echo "❌ Possible AWS Access Key found! Remove it immediately."
+            exit 1
+          else
+            echo "✅ No hardcoded AWS keys detected."
+          fi
+
+  validate-structure:
+    name: 📁 Validate Project Structure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check required files exist
+        run: |
+          echo "Checking required project files..."
+          files=("index.html" "scripts.js" "insertStudentData.py" "getStudents.py" "requirements.txt" "README.md")
+          for f in "${files[@]}"; do
+            if [ -f "$f" ]; then
+              echo "✅ $f found"
+            else
+              echo "⚠️  $f missing"
+            fi
+          done
+          echo "Structure check complete."
